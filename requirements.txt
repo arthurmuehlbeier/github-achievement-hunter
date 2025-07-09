@@ -1,0 +1,23 @@
+# GitHub API
+PyGithub==2.1.1
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Configuration
+PyYAML==6.0.1
+
+# HTTP requests (for additional API calls if needed)
+requests==2.31.0
+
+# CLI interface
+click==8.1.7
+
+# Progress bar for visual feedback
+tqdm==4.66.1
+
+# Colored output for better CLI experience
+colorama==0.4.6
+
+# Date/time handling
+python-dateutil==2.8.2
