@@ -12,9 +12,7 @@ from github import Github, GithubException, Auth
 from github.GithubException import BadCredentialsException, UnknownObjectException
 
 from .config import ConfigLoader
-
-
-logger = logging.getLogger(__name__)
+from .logger import AchievementLogger, log_context, log_errors
 
 
 class AuthenticationError(Exception):
@@ -55,13 +53,16 @@ class GitHubAuthenticator:
             AuthenticationError: If the token is invalid
             InsufficientScopesError: If the token lacks required scopes
         """
+        self.logger = AchievementLogger().get_logger()
         self.username = username
         self._token = token
         self._client: Optional[Github] = None
         
         # Validate token immediately
-        self._validate_token()
+        with log_context(f"Validating GitHub token for {username}", self.logger):
+            self._validate_token()
     
+    @log_errors(reraise=True)
     def _validate_token(self) -> None:
         """
         Validate the GitHub token and check OAuth scopes.
@@ -107,7 +108,7 @@ class GitHubAuthenticator:
                             f"Granted scopes: {', '.join(granted_scopes) if granted_scopes else 'none'}"
                         )
             
-            logger.info(f"Successfully validated token for user: {self.username}")
+            self.logger.info(f"Successfully validated token for user: {self.username}")
             
         except BadCredentialsException:
             raise AuthenticationError("Invalid GitHub token")
@@ -118,7 +119,7 @@ class GitHubAuthenticator:
             raise AuthenticationError(f"GitHub API error during validation: {str(e)}")
         except Exception as e:
             # Don't log the token itself
-            logger.error(f"Unexpected error during token validation: {type(e).__name__}")
+            self.logger.error(f"Unexpected error during token validation: {type(e).__name__}")
             raise AuthenticationError(f"Failed to validate token: {str(e)}")
     
     def get_client(self) -> Github:
@@ -134,7 +135,7 @@ class GitHubAuthenticator:
         if self._client is None:
             auth = Auth.Token(self._token)
             self._client = Github(auth=auth)
-            logger.debug(f"Created GitHub client for user: {self.username}")
+            self.logger.debug(f"Created GitHub client for user: {self.username}")
         
         return self._client
     
@@ -168,6 +169,7 @@ class GitHubAuthenticator:
         except KeyError as e:
             raise AuthenticationError(f"Missing required configuration key: {str(e)}")
     
+    @log_errors(reraise=False, log_args=True)
     def test_repository_access(self, repo_name: str) -> bool:
         """
         Test if the authenticated user can access a specific repository.
@@ -187,7 +189,7 @@ class GitHubAuthenticator:
         except UnknownObjectException:
             return False
         except Exception as e:
-            logger.warning(f"Error checking repository access: {str(e)}")
+            self.logger.warning(f"Error checking repository access: {str(e)}")
             return False
     
     def get_rate_limit_info(self) -> dict:
@@ -232,12 +234,13 @@ class MultiAccountAuthenticator:
             primary: Primary account authenticator
             secondary: Optional secondary account authenticator
         """
+        self.logger = AchievementLogger().get_logger()
         self.primary = primary
         self.secondary = secondary
         
-        logger.info(f"Initialized multi-account authenticator with primary: {primary.username}")
+        self.logger.info(f"Initialized multi-account authenticator with primary: {primary.username}")
         if secondary:
-            logger.info(f"Secondary account: {secondary.username}")
+            self.logger.info(f"Secondary account: {secondary.username}")
     
     @classmethod
     def from_config(cls, config: ConfigLoader) -> 'MultiAccountAuthenticator':
@@ -267,6 +270,8 @@ class MultiAccountAuthenticator:
             try:
                 secondary_auth = GitHubAuthenticator.from_config(secondary_config)
             except AuthenticationError as e:
+                # Create temporary logger for class method
+                logger = AchievementLogger().get_logger()
                 logger.warning(f"Failed to authenticate secondary account: {str(e)}")
         
         return cls(primary_auth, secondary_auth)

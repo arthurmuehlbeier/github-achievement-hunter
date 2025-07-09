@@ -5,6 +5,11 @@ from .auth import GitHubAuthenticator, MultiAccountAuthenticator, Authentication
 from .github_client import GitHubClient
 from .progress_tracker import ProgressTracker, ProgressError
 from .rate_limiter import RateLimiter, RateLimitError
+from .logger import (
+    AchievementLogger, LoggerError, ConfigurationError as LoggerConfigurationError,
+    APIError, LoggerRateLimitError, LoggerAuthenticationError, ValidationError,
+    log_context, suppress_and_log, log_errors, log_execution_time, default_logger
+)
 
 __all__ = [
     'ConfigLoader', 
@@ -17,5 +22,17 @@ __all__ = [
     'ProgressTracker',
     'ProgressError',
     'RateLimiter',
-    'RateLimitError'
+    'RateLimitError',
+    'AchievementLogger',
+    'LoggerError',
+    'LoggerConfigurationError',
+    'APIError',
+    'LoggerRateLimitError',
+    'LoggerAuthenticationError',
+    'ValidationError',
+    'log_context',
+    'suppress_and_log',
+    'log_errors',
+    'log_execution_time',
+    'default_logger'
 ]
