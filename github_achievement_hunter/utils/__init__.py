@@ -2,6 +2,7 @@
 
 from .config import ConfigLoader, ConfigError
 from .auth import GitHubAuthenticator, MultiAccountAuthenticator, AuthenticationError, InsufficientScopesError
+from .github_client import GitHubClient
 
 __all__ = [
     'ConfigLoader', 
@@ -9,5 +10,6 @@ __all__ = [
     'GitHubAuthenticator',
     'MultiAccountAuthenticator', 
     'AuthenticationError',
-    'InsufficientScopesError'
+    'InsufficientScopesError',
+    'GitHubClient'
 ]
