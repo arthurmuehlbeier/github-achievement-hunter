@@ -22,5 +22,8 @@ colorama==0.4.6
 # Date/time handling
 python-dateutil==2.8.2
 
+# Retry logic with exponential backoff
+tenacity==8.2.3
+
 # Testing
 pytest==7.4.3
