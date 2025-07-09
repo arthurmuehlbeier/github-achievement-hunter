@@ -20,10 +20,9 @@ from tenacity import (
     before_sleep_log
 )
 
+from .logger import AchievementLogger, log_context, log_errors, log_execution_time
+
 from .auth import GitHubAuthenticator
-
-
-logger = logging.getLogger(__name__)
 
 # Type variable for generic retry wrapper
 T = TypeVar('T')
@@ -56,13 +55,15 @@ class GitHubClient:
             auth_client: GitHubAuthenticator instance
             rate_limit_buffer: Number of API calls to keep in reserve (default: 100)
         """
+        self.logger = AchievementLogger().get_logger()
         self.client = auth_client.get_client()
         self.username = auth_client.username
         self.rate_limit_buffer = rate_limit_buffer
         self._last_rate_check = 0
         
-        logger.info(f"Initialized GitHubClient for user: {self.username}")
+        self.logger.info(f"Initialized GitHubClient for user: {self.username}")
     
+    @log_errors(reraise=True)
     def _check_rate_limit(self, force_check: bool = False) -> None:
         """
         Check and handle GitHub API rate limits.
@@ -87,14 +88,14 @@ class GitHubClient:
             
             self._last_rate_check = current_time
             
-            logger.debug(f"Rate limit: {core_limit.remaining}/{core_limit.limit}")
+            self.logger.debug(f"Rate limit: {core_limit.remaining}/{core_limit.limit}")
             
             if core_limit.remaining < self.rate_limit_buffer:
                 # Calculate sleep time
                 reset_timestamp = core_limit.reset.timestamp()
                 sleep_time = max(0, reset_timestamp - time.time() + 1)
                 
-                logger.warning(
+                self.logger.warning(
                     f"Rate limit low ({core_limit.remaining} remaining). "
                     f"Sleeping for {sleep_time:.0f} seconds until reset."
                 )
@@ -111,14 +112,14 @@ class GitHubClient:
                     )
                     
         except GithubException as e:
-            logger.error(f"Error checking rate limit: {str(e)}")
+            self.logger.error(f"Error checking rate limit: {str(e)}")
             # Don't fail on rate limit check errors
     
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10),
         retry=retry_if_exception_type(GithubException),
-        before_sleep=before_sleep_log(logger, logging.WARNING)
+        before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING)
     )
     def api_call_with_retry(self, func: Callable[..., T], *args, **kwargs) -> T:
         """
@@ -158,7 +159,7 @@ class GitHubClient:
         Raises:
             GithubException: If repository creation fails
         """
-        logger.info(f"Creating repository: {name}")
+        self.logger.info(f"Creating repository: {name}")
         
         def _create():
             user = self.client.get_user()
@@ -170,7 +171,7 @@ class GitHubClient:
             )
         
         repo = self.api_call_with_retry(_create)
-        logger.info(f"Successfully created repository: {repo.full_name}")
+        self.logger.info(f"Successfully created repository: {repo.full_name}")
         return repo
     
     def delete_repository(self, repo_name: str) -> None:
@@ -183,14 +184,14 @@ class GitHubClient:
         Raises:
             GithubException: If deletion fails
         """
-        logger.warning(f"Deleting repository: {repo_name}")
+        self.logger.warning(f"Deleting repository: {repo_name}")
         
         def _delete():
             repo = self.client.get_user().get_repo(repo_name)
             repo.delete()
         
         self.api_call_with_retry(_delete)
-        logger.info(f"Successfully deleted repository: {repo_name}")
+        self.logger.info(f"Successfully deleted repository: {repo_name}")
     
     def create_pull_request(self, repo_name: str, title: str, body: str,
                           head: str, base: str = "main") -> PullRequest.PullRequest:
@@ -210,7 +211,7 @@ class GitHubClient:
         Raises:
             GithubException: If PR creation fails
         """
-        logger.info(f"Creating pull request in {repo_name}: {title}")
+        self.logger.info(f"Creating pull request in {repo_name}: {title}")
         
         def _create():
             repo = self.client.get_repo(repo_name)
@@ -222,7 +223,7 @@ class GitHubClient:
             )
         
         pr = self.api_call_with_retry(_create)
-        logger.info(f"Successfully created PR #{pr.number} in {repo_name}")
+        self.logger.info(f"Successfully created PR #{pr.number} in {repo_name}")
         return pr
     
     def merge_pull_request(self, repo_name: str, pr_number: int, 
@@ -238,7 +239,7 @@ class GitHubClient:
         Raises:
             GithubException: If merge fails
         """
-        logger.info(f"Merging PR #{pr_number} in {repo_name}")
+        self.logger.info(f"Merging PR #{pr_number} in {repo_name}")
         
         def _merge():
             repo = self.client.get_repo(repo_name)
@@ -246,7 +247,7 @@ class GitHubClient:
             pr.merge(commit_message=commit_message)
         
         self.api_call_with_retry(_merge)
-        logger.info(f"Successfully merged PR #{pr_number} in {repo_name}")
+        self.logger.info(f"Successfully merged PR #{pr_number} in {repo_name}")
     
     def create_issue(self, repo_name: str, title: str, body: str = "",
                     labels: Optional[List[str]] = None) -> Issue.Issue:
@@ -265,7 +266,7 @@ class GitHubClient:
         Raises:
             GithubException: If issue creation fails
         """
-        logger.info(f"Creating issue in {repo_name}: {title}")
+        self.logger.info(f"Creating issue in {repo_name}: {title}")
         
         def _create():
             repo = self.client.get_repo(repo_name)
@@ -276,7 +277,7 @@ class GitHubClient:
             )
         
         issue = self.api_call_with_retry(_create)
-        logger.info(f"Successfully created issue #{issue.number} in {repo_name}")
+        self.logger.info(f"Successfully created issue #{issue.number} in {repo_name}")
         return issue
     
     def close_issue(self, repo_name: str, issue_number: int) -> None:
@@ -290,7 +291,7 @@ class GitHubClient:
         Raises:
             GithubException: If closing fails
         """
-        logger.info(f"Closing issue #{issue_number} in {repo_name}")
+        self.logger.info(f"Closing issue #{issue_number} in {repo_name}")
         
         def _close():
             repo = self.client.get_repo(repo_name)
@@ -298,7 +299,7 @@ class GitHubClient:
             issue.edit(state='closed')
         
         self.api_call_with_retry(_close)
-        logger.info(f"Successfully closed issue #{issue_number} in {repo_name}")
+        self.logger.info(f"Successfully closed issue #{issue_number} in {repo_name}")
     
     def star_repository(self, repo_name: str) -> None:
         """
@@ -310,7 +311,7 @@ class GitHubClient:
         Raises:
             GithubException: If starring fails
         """
-        logger.info(f"Starring repository: {repo_name}")
+        self.logger.info(f"Starring repository: {repo_name}")
         
         def _star():
             user = self.client.get_user()
@@ -318,7 +319,7 @@ class GitHubClient:
             user.add_to_starred(repo)
         
         self.api_call_with_retry(_star)
-        logger.info(f"Successfully starred repository: {repo_name}")
+        self.logger.info(f"Successfully starred repository: {repo_name}")
     
     def fork_repository(self, repo_name: str) -> Repository.Repository:
         """
@@ -333,14 +334,14 @@ class GitHubClient:
         Raises:
             GithubException: If forking fails
         """
-        logger.info(f"Forking repository: {repo_name}")
+        self.logger.info(f"Forking repository: {repo_name}")
         
         def _fork():
             repo = self.client.get_repo(repo_name)
             return repo.create_fork()
         
         forked_repo = self.api_call_with_retry(_fork)
-        logger.info(f"Successfully forked repository: {forked_repo.full_name}")
+        self.logger.info(f"Successfully forked repository: {forked_repo.full_name}")
         return forked_repo
     
     def create_gist(self, description: str, files: Dict[str, str], 
@@ -359,7 +360,7 @@ class GitHubClient:
         Raises:
             GithubException: If gist creation fails
         """
-        logger.info(f"Creating {'public' if public else 'private'} gist: {description}")
+        self.logger.info(f"Creating {'public' if public else 'private'} gist: {description}")
         
         def _create():
             user = self.client.get_user()
@@ -375,7 +376,7 @@ class GitHubClient:
             )
         
         gist = self.api_call_with_retry(_create)
-        logger.info(f"Successfully created gist: {gist.id}")
+        self.logger.info(f"Successfully created gist: {gist.id}")
         return gist
     
     def follow_user(self, username: str) -> None:
@@ -388,7 +389,7 @@ class GitHubClient:
         Raises:
             GithubException: If following fails
         """
-        logger.info(f"Following user: {username}")
+        self.logger.info(f"Following user: {username}")
         
         def _follow():
             user = self.client.get_user()
@@ -396,7 +397,7 @@ class GitHubClient:
             user.add_to_following(target_user)
         
         self.api_call_with_retry(_follow)
-        logger.info(f"Successfully followed user: {username}")
+        self.logger.info(f"Successfully followed user: {username}")
     
     def get_user_repositories(self, username: Optional[str] = None) -> List[Repository.Repository]:
         """
@@ -412,7 +413,7 @@ class GitHubClient:
             GithubException: If fetching fails
         """
         username = username or self.username
-        logger.info(f"Fetching repositories for user: {username}")
+        self.logger.info(f"Fetching repositories for user: {username}")
         
         def _get_repos():
             if username == self.username:
@@ -422,7 +423,7 @@ class GitHubClient:
             return list(user.get_repos())
         
         repos = self.api_call_with_retry(_get_repos)
-        logger.info(f"Found {len(repos)} repositories for user: {username}")
+        self.logger.info(f"Found {len(repos)} repositories for user: {username}")
         return repos
     
     def get_rate_limit_info(self) -> Dict[str, Any]:

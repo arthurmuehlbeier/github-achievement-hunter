@@ -4,6 +4,8 @@ import yaml
 from typing import Any, Dict, Optional, Union
 from pathlib import Path
 
+from .logger import AchievementLogger, log_context, log_errors
+
 
 class ConfigError(Exception):
     """Raised when there's an error in configuration loading or validation."""
@@ -29,12 +31,18 @@ class ConfigLoader:
         Args:
             config_path: Path to the configuration file
         """
+        self.logger = AchievementLogger().get_logger()
         self.config_path = Path(config_path)
-        self.config = self._load_config()
-        self.config = self._substitute_env_vars(self.config)
-        self._apply_defaults()
-        self._validate_config()
+        
+        with log_context(f"Loading configuration from {config_path}", self.logger):
+            self.config = self._load_config()
+            self.config = self._substitute_env_vars(self.config)
+            self._apply_defaults()
+            self._validate_config()
+            
+        self.logger.info(f"Configuration loaded successfully from {self.config_path}")
     
+    @log_errors(reraise=True)
     def _load_config(self) -> Dict[str, Any]:
         """
         Load configuration from YAML file.
@@ -46,17 +54,22 @@ class ConfigLoader:
             ConfigError: If the file cannot be read or parsed
         """
         if not self.config_path.exists():
+            self.logger.error(f"Configuration file not found: {self.config_path}")
             raise ConfigError(f"Configuration file not found: {self.config_path}")
         
         try:
             with open(self.config_path, 'r') as f:
                 config = yaml.safe_load(f)
                 if config is None:
+                    self.logger.debug("Empty configuration file, returning empty dict")
                     return {}
+                self.logger.debug(f"Loaded {len(config)} top-level configuration sections")
                 return config
         except yaml.YAMLError as e:
+            self.logger.error(f"YAML parsing error: {e}")
             raise ConfigError(f"Error parsing YAML file: {e}")
         except Exception as e:
+            self.logger.error(f"Failed to read configuration file: {e}")
             raise ConfigError(f"Error reading configuration file: {e}")
     
     def _substitute_env_vars(self, obj: Any) -> Any:
@@ -85,7 +98,9 @@ class ConfigLoader:
                 value = os.getenv(var_name)
                 if value is None:
                     # Keep the original placeholder if env var not found
+                    self.logger.warning(f"Environment variable {var_name} not found, keeping placeholder")
                     return match.group(0)
+                self.logger.debug(f"Substituted environment variable {var_name}")
                 return value
             
             return pattern.sub(replacer, obj)
@@ -192,6 +207,7 @@ class ConfigLoader:
         
         return result
     
+    @log_errors(reraise=True)
     def _validate_config(self):
         """
         Validate the configuration to ensure all required fields exist and are valid.
@@ -199,6 +215,8 @@ class ConfigLoader:
         Raises:
             ConfigError: If validation fails
         """
+        self.logger.debug("Validating configuration")
+        
         # Check required fields
         required_fields = [
             'github.token',
@@ -294,7 +312,10 @@ class ConfigLoader:
     
     def reload(self):
         """Reload the configuration from file."""
-        self.config = self._load_config()
-        self.config = self._substitute_env_vars(self.config)
-        self._apply_defaults()
-        self._validate_config()
+        self.logger.info("Reloading configuration")
+        with log_context("Configuration reload", self.logger):
+            self.config = self._load_config()
+            self.config = self._substitute_env_vars(self.config)
+            self._apply_defaults()
+            self._validate_config()
+        self.logger.info("Configuration reloaded successfully")

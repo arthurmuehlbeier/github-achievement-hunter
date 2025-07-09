@@ -14,8 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-
-logger = logging.getLogger(__name__)
+from .logger import AchievementLogger, log_context, log_errors
 
 
 class ProgressError(Exception):
@@ -64,11 +63,15 @@ class ProgressTracker:
         self.progress_file.parent.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         
+        # Initialize logger
+        self.logger = AchievementLogger().get_logger()
+        
         # Load existing progress or create default
-        self.progress = self._load_progress()
+        with log_context(f"Loading progress from {progress_file}", self.logger):
+            self.progress = self._load_progress()
         self._last_save_time = None
         
-        logger.info(f"Initialized ProgressTracker with file: {self.progress_file}")
+        self.logger.info(f"Initialized ProgressTracker with file: {self.progress_file}")
     
     def _default_progress(self) -> Dict[str, Any]:
         """
@@ -132,6 +135,7 @@ class ProgressTracker:
             }
         }
     
+    @log_errors(reraise=True)
     def _load_progress(self) -> Dict[str, Any]:
         """
         Load progress from file with error recovery.
@@ -144,7 +148,7 @@ class ProgressTracker:
         """
         # If no file exists, return default
         if not self.progress_file.exists():
-            logger.info("No existing progress file, creating default")
+            self.logger.info("No existing progress file, creating default")
             return self._default_progress()
         
         try:
@@ -152,15 +156,15 @@ class ProgressTracker:
             with open(self.progress_file, 'r') as f:
                 content = f.read()
                 if not content.strip():
-                    logger.warning("Progress file is empty, using default")
+                    self.logger.warning("Progress file is empty, using default")
                     return self._default_progress()
                 
                 progress = json.loads(content)
-                logger.info("Successfully loaded progress file")
+                self.logger.info("Successfully loaded progress file")
                 return progress
                 
         except (json.JSONDecodeError, IOError) as e:
-            logger.error(f"Failed to load progress file: {e}")
+            self.logger.error(f"Failed to load progress file: {e}")
             
             # Backup corrupted file first
             self._backup_corrupted_file()
@@ -171,7 +175,7 @@ class ProgressTracker:
                 return recovered
             
             # If no recovery possible, log and return default
-            logger.warning("No valid backup found, starting fresh")
+            self.logger.warning("No valid backup found, starting fresh")
             return self._default_progress()
     
     def _recover_from_backup(self) -> Optional[Dict[str, Any]]:
@@ -195,14 +199,14 @@ class ProgressTracker:
             try:
                 with open(backup_file, 'r') as f:
                     progress = json.load(f)
-                logger.info(f"Successfully recovered from backup: {backup_file}")
+                self.logger.info(f"Successfully recovered from backup: {backup_file}")
                 
                 # Restore the backup to main file
                 shutil.copy2(backup_file, self.progress_file)
                 return progress
                 
             except (json.JSONDecodeError, IOError) as e:
-                logger.warning(f"Backup file {backup_file} is corrupted: {e}")
+                self.logger.warning(f"Backup file {backup_file} is corrupted: {e}")
                 continue
         
         return None
@@ -214,9 +218,9 @@ class ProgressTracker:
             corrupted_path = self.backup_dir / f'corrupted_{timestamp}.json'
             try:
                 shutil.move(str(self.progress_file), str(corrupted_path))
-                logger.info(f"Moved corrupted file to: {corrupted_path}")
+                self.logger.info(f"Moved corrupted file to: {corrupted_path}")
             except Exception as e:
-                logger.error(f"Failed to backup corrupted file: {e}")
+                self.logger.error(f"Failed to backup corrupted file: {e}")
     
     def _create_backup(self) -> None:
         """Create a backup of the current progress file."""
@@ -228,13 +232,13 @@ class ProgressTracker:
         
         try:
             shutil.copy2(self.progress_file, backup_path)
-            logger.debug(f"Created backup: {backup_path}")
+            self.logger.debug(f"Created backup: {backup_path}")
             
             # Clean old backups
             self._cleanup_old_backups()
             
         except Exception as e:
-            logger.error(f"Failed to create backup: {e}")
+            self.logger.error(f"Failed to create backup: {e}")
     
     def _cleanup_old_backups(self) -> None:
         """Remove old backups keeping only the most recent ones."""
@@ -248,10 +252,11 @@ class ProgressTracker:
         for backup in backups[self.MAX_BACKUPS:]:
             try:
                 backup.unlink()
-                logger.debug(f"Removed old backup: {backup}")
+                self.logger.debug(f"Removed old backup: {backup}")
             except Exception as e:
-                logger.error(f"Failed to remove backup {backup}: {e}")
+                self.logger.error(f"Failed to remove backup {backup}: {e}")
     
+    @log_errors(reraise=True)
     def _save_progress(self) -> None:
         """
         Save progress to file atomically.
@@ -287,10 +292,10 @@ class ProgressTracker:
             os.replace(tmp_path, self.progress_file)
             
             self._last_save_time = datetime.now(timezone.utc)
-            logger.debug("Successfully saved progress")
+            self.logger.debug("Successfully saved progress")
             
         except Exception as e:
-            logger.error(f"Failed to save progress: {e}")
+            self.logger.error(f"Failed to save progress: {e}")
             # Clean up temporary file if it exists
             if 'tmp_path' in locals() and os.path.exists(tmp_path):
                 try:
@@ -322,7 +327,7 @@ class ProgressTracker:
         # Save immediately
         self._save_progress()
         
-        logger.info(f"Updated achievement '{achievement}': {data}")
+        self.logger.info(f"Updated achievement '{achievement}': {data}")
     
     def update_repository(self, repo_data: Dict[str, Any]) -> None:
         """
@@ -334,7 +339,7 @@ class ProgressTracker:
         self.progress['repository'].update(repo_data)
         self._save_progress()
         
-        logger.info(f"Updated repository: {repo_data}")
+        self.logger.info(f"Updated repository: {repo_data}")
     
     def increment_statistic(self, stat: str, amount: int = 1) -> None:
         """
@@ -419,7 +424,7 @@ class ProgressTracker:
         self.progress = self._default_progress()
         self._save_progress()
         
-        logger.warning("Progress has been reset to default state")
+        self.logger.warning("Progress has been reset to default state")
     
     def export_progress(self, export_path: str) -> None:
         """
@@ -431,7 +436,7 @@ class ProgressTracker:
         with open(export_path, 'w') as f:
             json.dump(self.progress, f, indent=2, sort_keys=True)
         
-        logger.info(f"Exported progress to: {export_path}")
+        self.logger.info(f"Exported progress to: {export_path}")
     
     def get_summary(self) -> Dict[str, Any]:
         """

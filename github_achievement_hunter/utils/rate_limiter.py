@@ -15,8 +15,7 @@ from typing import Callable, Dict, Any, Optional, TypeVar, Tuple
 from github import Github, GithubException
 from github.GithubException import RateLimitExceededException
 
-
-logger = logging.getLogger(__name__)
+from .logger import AchievementLogger, log_context, log_errors, log_execution_time
 
 # Type variable for generic decorator
 T = TypeVar('T')
@@ -87,7 +86,10 @@ class RateLimiter:
         self._last_rate_check = 0
         self._cached_limits: Dict[str, Any] = {}
         
-        logger.info(f"Initialized RateLimiter with buffer: {buffer}")
+        # Initialize logger
+        self.logger = AchievementLogger().get_logger()
+        
+        self.logger.info(f"Initialized RateLimiter with buffer: {buffer}")
     
     def _categorize_endpoint(self, url: Optional[str] = None) -> str:
         """
@@ -111,6 +113,7 @@ class RateLimiter:
         else:
             return 'core'
     
+    @log_errors(reraise=False)
     def _get_current_limits(self, force_check: bool = False) -> Dict[str, Any]:
         """
         Get current rate limit information from GitHub.
@@ -146,7 +149,7 @@ class RateLimiter:
             return self._cached_limits
             
         except Exception as e:
-            logger.error(f"Failed to get rate limits: {e}")
+            self.logger.error(f"Failed to get rate limits: {e}")
             # Return conservative defaults
             return {
                 'core': {'remaining': 100, 'limit': 5000, 'reset': None},
@@ -186,7 +189,7 @@ class RateLimiter:
         recent_requests = sum(1 for t in self.request_times if t > one_minute_ago)
         
         if recent_requests >= self.BURST_THRESHOLD:
-            logger.warning(f"Burst limit approaching: {recent_requests} requests in last minute")
+            self.logger.warning(f"Burst limit approaching: {recent_requests} requests in last minute")
             return False
         
         return True
@@ -266,11 +269,12 @@ class RateLimiter:
                 suggested_interval = 3600 / 3500  # ~1.03 seconds
                 suggested_delay = max(0, suggested_interval - avg_interval)
                 
-                logger.info(f"Predictive throttling: {predicted_requests_per_hour:.0f} req/hr predicted")
+                self.logger.info(f"Predictive throttling: {predicted_requests_per_hour:.0f} req/hr predicted")
                 return True, suggested_delay
         
         return False, 0
     
+    @log_execution_time()
     def check_and_wait(self, endpoint_url: Optional[str] = None) -> None:
         """
         Check rate limits and wait if necessary.
@@ -287,11 +291,11 @@ class RateLimiter:
         should_throttle, throttle_delay = self._predict_rate_limit()
         if should_throttle and throttle_delay > wait_time:
             wait_time = throttle_delay
-            logger.info(f"Predictive throttling: adding {throttle_delay:.1f}s delay")
+            self.logger.info(f"Predictive throttling: adding {throttle_delay:.1f}s delay")
         
         # Wait if necessary
         if wait_time > 0:
-            logger.warning(f"Rate limit approaching, waiting {wait_time:.1f}s")
+            self.logger.warning(f"Rate limit approaching, waiting {wait_time:.1f}s")
             time.sleep(wait_time)
         
         # Track this request
@@ -340,7 +344,7 @@ class RateLimiter:
             except:
                 pass
         
-        logger.warning(f"Rate limit error, backing off for {backoff_with_jitter:.1f}s "
+        self.logger.warning(f"Rate limit error, backing off for {backoff_with_jitter:.1f}s "
                       f"(attempt {self.backoff_state['consecutive_failures']})")
         
         return backoff_with_jitter
