@@ -1,0 +1,1 @@
+"""Achievement hunter modules for specific GitHub achievements."""
