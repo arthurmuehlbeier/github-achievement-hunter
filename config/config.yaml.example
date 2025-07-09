@@ -1,0 +1,178 @@
+# GitHub Achievement Hunter Configuration
+# Copy this file to config.yaml and update with your settings
+
+# GitHub API Configuration
+github:
+  # Personal Access Token - Required
+  # Generate at: https://github.com/settings/tokens
+  # Required scopes: repo, user, read:org
+  token: ${GITHUB_TOKEN}
+  
+  # API rate limiting
+  rate_limit:
+    # Requests per hour (GitHub API limit is 5000 for authenticated requests)
+    requests_per_hour: 4500
+    # Delay between requests in seconds
+    request_delay: 0.8
+
+# Target User Configuration
+target:
+  # GitHub username to track achievements for - Required
+  username: ${TARGET_USERNAME}
+  
+  # Email for notifications (optional)
+  email: ${TARGET_EMAIL}
+
+# Achievement Targets
+achievements:
+  # Target number of stars across all repositories
+  stars: 100
+  
+  # Target number of followers
+  followers: 50
+  
+  # Target number of public repositories
+  repositories: 30
+  
+  # Target number of pull requests (created)
+  pull_requests: 100
+  
+  # Target number of issues (created)
+  issues: 50
+  
+  # Target number of commits
+  commits: 1000
+  
+  # Target number of organizations
+  organizations: 5
+  
+  # Target contribution streak in days
+  streak_days: 30
+  
+  # Target repositories with specific language
+  language_repos:
+    python: 10
+    javascript: 5
+    typescript: 3
+
+# Notification Settings
+notifications:
+  # Enable/disable notifications
+  enabled: true
+  
+  # Notification methods
+  methods:
+    # Console output
+    console: true
+    
+    # Email notifications (requires email in target section)
+    email: false
+    
+    # Webhook notifications
+    webhook:
+      enabled: false
+      url: ${WEBHOOK_URL}
+      
+  # Notification triggers
+  triggers:
+    # Notify on achievement unlock
+    achievement_unlock: true
+    
+    # Notify on milestone progress (25%, 50%, 75%)
+    milestone_progress: true
+    
+    # Daily summary
+    daily_summary: false
+
+# Database Configuration
+database:
+  # Database type: sqlite, postgresql, mysql
+  type: sqlite
+  
+  # SQLite specific settings
+  sqlite:
+    path: ./data/achievements.db
+  
+  # PostgreSQL/MySQL settings (if using)
+  # postgresql:
+  #   host: ${DB_HOST}
+  #   port: ${DB_PORT}
+  #   database: ${DB_NAME}
+  #   username: ${DB_USER}
+  #   password: ${DB_PASSWORD}
+
+# Logging Configuration
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  
+  # Log file settings
+  file:
+    enabled: true
+    path: ./logs/achievement_hunter.log
+    max_size_mb: 10
+    backup_count: 5
+  
+  # Console logging
+  console:
+    enabled: true
+    colorized: true
+
+# Monitoring Configuration
+monitoring:
+  # Enable monitoring dashboard
+  dashboard:
+    enabled: true
+    port: 8080
+    host: 0.0.0.0
+  
+  # Metrics collection
+  metrics:
+    enabled: true
+    interval_seconds: 300
+
+# Cache Configuration
+cache:
+  # Enable caching to reduce API calls
+  enabled: true
+  
+  # Cache backend: memory, redis
+  backend: memory
+  
+  # Cache TTL in seconds
+  ttl: 3600
+  
+  # Redis settings (if using)
+  # redis:
+  #   host: ${REDIS_HOST}
+  #   port: ${REDIS_PORT}
+  #   password: ${REDIS_PASSWORD}
+
+# Scheduler Configuration
+scheduler:
+  # Enable automatic tracking
+  enabled: true
+  
+  # Tracking schedule (cron format)
+  # Default: Every hour
+  schedule: "0 * * * *"
+  
+  # Timezone for scheduling
+  timezone: "UTC"
+
+# Advanced Settings
+advanced:
+  # Retry failed API requests
+  retry:
+    enabled: true
+    max_attempts: 3
+    backoff_factor: 2
+  
+  # Request timeout in seconds
+  timeout: 30
+  
+  # User agent for API requests
+  user_agent: "GitHub-Achievement-Hunter/1.0"
+  
+  # Enable debug mode
+  debug: false
