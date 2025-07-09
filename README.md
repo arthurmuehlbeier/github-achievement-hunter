@@ -22,27 +22,63 @@ GitHub Achievement Hunter automates the process of earning 5 specific GitHub ach
 
 ## Installation
 
+### Method 1: Quick Setup (Recommended)
+
 1. Clone the repository:
 ```bash
 git clone https://github.com/yourusername/github-achievement-hunter.git
 cd github-achievement-hunter
 ```
 
-2. Install dependencies:
+2. Run the setup script:
 ```bash
-pip install -r requirements.txt
+chmod +x scripts/setup.sh
+./scripts/setup.sh
 ```
 
-3. Copy the environment variables template:
-```bash
-cp .env.example .env
-```
-
-4. Configure your GitHub credentials in `.env`:
+3. Configure your GitHub credentials in `.env`:
 ```bash
 GITHUB_PRIMARY_TOKEN=your_primary_token_here
 GITHUB_SECONDARY_TOKEN=your_secondary_token_here
 ```
+
+### Method 2: Manual Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/github-achievement-hunter.git
+cd github-achievement-hunter
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Copy the environment variables template:
+```bash
+cp .env.example .env
+```
+
+5. Configure your GitHub credentials in `.env`:
+```bash
+GITHUB_PRIMARY_TOKEN=your_primary_token_here
+GITHUB_SECONDARY_TOKEN=your_secondary_token_here
+```
+
+### Method 3: Package Installation
+
+```bash
+pip install git+https://github.com/yourusername/github-achievement-hunter.git
+```
+
+After installation, the `github-achievement-hunter` command will be available globally.
 
 ## Configuration
 
@@ -79,20 +115,45 @@ achievements:
 Run the achievement hunter:
 
 ```bash
-python -m github_achievement_hunter.main
+python main.py
 ```
 
 ### Command Line Options
 
 ```bash
+# Show help and all available options
+python main.py --help
+
 # Run specific achievements only
-python -m github_achievement_hunter.main --achievements pull_shark,quickdraw
+python main.py --achievements quickdraw yolo pull_shark
+
+# Run all achievements
+python main.py --achievements all
 
 # Dry run mode (no actual API calls)
-python -m github_achievement_hunter.main --dry-run
+python main.py --dry-run
 
-# Resume from previous progress
-python -m github_achievement_hunter.main --resume
+# Use custom configuration file
+python main.py --config path/to/config.yaml
+
+# Set custom progress file
+python main.py --progress-file my-progress.json
+
+# Set logging level
+python main.py --log-level DEBUG
+```
+
+### Examples
+
+```bash
+# Run only Quickdraw and YOLO achievements
+python main.py -a quickdraw yolo
+
+# Run with debug logging and dry-run mode
+python main.py --log-level DEBUG --dry-run
+
+# Use custom config and run specific achievements
+python main.py -c custom-config.yaml -a pair_extraordinaire galaxy_brain
 ```
 
 ## Progress Tracking
@@ -106,10 +167,18 @@ The tool automatically saves progress to `progress.json` and can resume from int
 ## Rate Limiting
 
 The tool respects GitHub's API rate limits:
-- Implements exponential backoff
+- Implements exponential backoff with automatic retry
 - Batches operations where possible
-- Tracks remaining API calls
+- Tracks remaining API calls and warns when low
+- Pauses execution when rate limit is exceeded
 - Estimated completion time: ~20-30 hours for all achievements
+
+### API Rate Limits
+- **Authenticated requests**: 5,000 per hour
+- **GraphQL requests**: 5,000 points per hour
+- **Secondary rate limits**: May apply for rapid creation of content
+
+The tool automatically handles rate limiting, but you can monitor API usage in the logs.
 
 ## Project Structure
 
@@ -122,12 +191,46 @@ github_achievement_hunter/
 └── main.py           # Entry point
 ```
 
+## Troubleshooting
+
+### Common Issues
+
+**Authentication Failed**
+- Verify your GitHub tokens have the required scopes: `repo`, `workflow`, `write:discussion`
+- Check that tokens are correctly set in `.env` file
+- Ensure tokens haven't expired
+
+**Rate Limit Exceeded**
+- The tool will automatically wait and retry
+- Consider running fewer achievements at once
+- Use `--log-level DEBUG` to see detailed rate limit information
+
+**Permission Denied**
+- Ensure both accounts have appropriate permissions
+- For Galaxy Brain, enable GitHub Discussions on the repository
+- Check repository settings allow issues and pull requests
+
+**Module Not Found**
+- Ensure you're in the project directory
+- Activate the virtual environment: `source venv/bin/activate`
+- Reinstall dependencies: `pip install -r requirements.txt`
+
+### Debug Mode
+
+Run with debug logging to see detailed information:
+```bash
+python main.py --log-level DEBUG
+```
+
+Check logs in the `logs/` directory for detailed error messages.
+
 ## Security
 
 - Never commit tokens or credentials
 - Use environment variables for sensitive data
 - All credentials are stored securely
 - `.gitignore` configured for safety
+- Tokens should have minimal required scopes
 
 ## Compliance
 
