@@ -46,7 +46,7 @@ class AchievementHunter(ABC):
         self.github_client = github_client
         self.progress_tracker = progress_tracker
         self.config = config
-        self.logger = logger or AchievementLogger().get_logger(f"achievements.{achievement_name}")
+        self.logger = logger or AchievementLogger().get_logger().getChild(f"achievements.{achievement_name}")
         
         # Get achievement-specific configuration
         self.achievement_config = self._get_achievement_config()
