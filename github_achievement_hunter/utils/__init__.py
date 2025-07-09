@@ -4,6 +4,7 @@ from .config import ConfigLoader, ConfigError
 from .auth import GitHubAuthenticator, MultiAccountAuthenticator, AuthenticationError, InsufficientScopesError
 from .github_client import GitHubClient
 from .progress_tracker import ProgressTracker, ProgressError
+from .rate_limiter import RateLimiter, RateLimitError
 
 __all__ = [
     'ConfigLoader', 
@@ -14,5 +15,7 @@ __all__ = [
     'InsufficientScopesError',
     'GitHubClient',
     'ProgressTracker',
-    'ProgressError'
+    'ProgressError',
+    'RateLimiter',
+    'RateLimitError'
 ]
