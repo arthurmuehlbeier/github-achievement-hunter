@@ -3,7 +3,8 @@
 YOLO Achievement Hunter
 
 This module implements the hunter for the YOLO achievement.
-The YOLO achievement is earned by merging a pull request without any review.
+The YOLO achievement is earned by merging a pull request with a pending review
+(i.e., merging before the reviewer completes their review).
 """
 
 from typing import Tuple, Dict, Any, Optional
@@ -19,11 +20,12 @@ from .base import AchievementHunter
 
 class YoloHunter(AchievementHunter):
     """
-    Hunts the YOLO achievement by creating and merging a PR without review.
+    Hunts the YOLO achievement by creating and merging a PR with pending review.
     
     This achievement requires:
     - Creating a pull request
-    - Merging it immediately without any review
+    - Requesting a review from another user
+    - Merging it while the review is still pending
     """
     
     def __init__(
@@ -51,6 +53,7 @@ class YoloHunter(AchievementHunter):
         )
         
         self.repo_name = self.config.get('repository.name', 'achievement-hunter-repo')
+        self.reviewer_username = self.config.get('achievements.yolo.reviewer', None)
         
     def validate_requirements(self) -> Tuple[bool, str]:
         """Validate that requirements are met for this achievement."""
@@ -58,10 +61,18 @@ class YoloHunter(AchievementHunter):
         if not self.repo_name:
             return False, "Repository name must be configured"
         
+        # Check if reviewer is configured
+        if not self.reviewer_username:
+            return False, "Reviewer username must be configured for YOLO achievement (achievements.yolo.reviewer)"
+        
         # Verify GitHub client can authenticate
         try:
             user = self.github_client.client.get_user()
             self.logger.info(f"Authenticated as: {user.login}")
+            
+            # Verify reviewer is not the same as authenticated user
+            if user.login.lower() == self.reviewer_username.lower():
+                return False, "Reviewer cannot be the same as the authenticated user"
         except Exception as e:
             return False, f"Failed to authenticate: {str(e)}"
         
@@ -102,9 +113,11 @@ class YoloHunter(AchievementHunter):
             # Update progress with branch and file details
             self.progress_tracker.update_achievement(
                 self.achievement_name,
-                branch_name=branch_name,
-                file_path=file_path,
-                commit_sha=commit['commit'].sha
+                {
+                    'branch_name': branch_name,
+                    'file_path': file_path,
+                    'commit_sha': commit['commit'].sha
+                }
             )
             
             # Wait a moment to ensure GitHub processes the commit
@@ -114,7 +127,7 @@ class YoloHunter(AchievementHunter):
             self.logger.info("Creating pull request...")
             pr = repo.create_pull(
                 title='YOLO Achievement PR',
-                body='Merging without review for YOLO achievement! 🎯',
+                body='This PR will be merged with a pending review for YOLO achievement! 🎯',
                 base=default_branch,
                 head=branch_name
             )
@@ -124,31 +137,54 @@ class YoloHunter(AchievementHunter):
             # Update progress with PR details
             self.progress_tracker.update_achievement(
                 self.achievement_name,
-                pr_number=pr.number,
-                pr_url=pr.html_url,
-                created_at=datetime.now().isoformat()
+                {
+                    'pr_number': pr.number,
+                    'pr_url': pr.html_url,
+                    'created_at': datetime.now().isoformat()
+                }
             )
             
-            # Wait a moment before merging
-            time.sleep(2)
+            # Request review from configured reviewer
+            self.logger.info(f"Requesting review from {self.reviewer_username}...")
+            try:
+                pr.create_review_request(reviewers=[self.reviewer_username])
+                self.logger.info("Review requested successfully!")
+                
+                # Update progress
+                self.progress_tracker.update_achievement(
+                    self.achievement_name,
+                    {
+                        'reviewer_requested': self.reviewer_username,
+                        'review_requested_at': datetime.now().isoformat()
+                    }
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to request review: {e}")
+                self.logger.warning("Note: The reviewer must be a collaborator on the repository")
+                return False
             
-            # Merge immediately without review
-            self.logger.info(f"Merging PR #{pr.number} without review...")
+            # Wait a moment to ensure review request is registered
+            time.sleep(3)
+            
+            # Merge with pending review
+            self.logger.info(f"Merging PR #{pr.number} with pending review...")
             merge_result = pr.merge(
                 merge_method='merge',
                 commit_title=f'Merge PR #{pr.number}: YOLO Achievement',
-                commit_message='Merged without review for YOLO achievement!'
+                commit_message='Merged with pending review for YOLO achievement!'
             )
             
             if merge_result.merged:
-                self.logger.info(f"Successfully merged PR #{pr.number} without review!")
+                self.logger.info(f"Successfully merged PR #{pr.number} with pending review!")
                 
                 # Update progress with completion details
                 self.progress_tracker.update_achievement(
                     self.achievement_name,
-                    merged_at=datetime.now().isoformat(),
-                    merge_sha=merge_result.sha,
-                    yolo_achieved=True
+                    {
+                        'merged_at': datetime.now().isoformat(),
+                        'merge_sha': merge_result.sha,
+                        'yolo_achieved': True
+                    }
                 )
                 
                 # Clean up branch

@@ -1,0 +1,70 @@
+# Minimal GitHub Achievement Hunter Configuration for YOLO Achievement
+
+# GitHub API Configuration
+github:
+  # Personal Access Token - Required at top level
+  token: YOUR_GITHUB_TOKEN_HERE
+  
+  # Primary account configuration
+  primary_account:
+    username: YOUR_USERNAME_HERE
+    token: YOUR_GITHUB_TOKEN_HERE
+  
+  # Secondary account (optional - not needed for YOLO)
+  # secondary_account:
+  #   username: second_user
+  #   token: second_token
+
+# Target User Configuration
+target:
+  # GitHub username to track achievements for - Required
+  username: YOUR_USERNAME_HERE
+
+# Repository configuration
+repository:
+  name: yolo-achievement-test-repo
+
+# Settings
+settings:
+  rate_limit_buffer: 100
+  dry_run: false
+  continue_on_error: true
+
+# Achievement configuration - simplified integers for validation
+achievements:
+  stars: 1
+  followers: 1
+  repositories: 1
+  pull_requests: 1
+  issues: 1
+  commits: 1
+  organizations: 1
+  streak_days: 1
+  yolo:
+    enabled: true
+    # Reviewer username - must be a collaborator on the repository
+    reviewer: YOUR_COLLABORATOR_USERNAME_HERE
+  quickdraw:
+    enabled: false
+  pull_shark:
+    enabled: false
+  pair_extraordinaire:
+    enabled: false
+  galaxy_brain:
+    enabled: false
+
+# Minimal database configuration
+database:
+  type: sqlite
+  sqlite:
+    path: ./data/test_achievements.db
+
+# Simple logging configuration
+logging:
+  level: INFO
+  file:
+    enabled: true
+    path: ./logs/test_achievement_hunter.log
+  console:
+    enabled: true
+    colorized: true

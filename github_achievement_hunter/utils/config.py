@@ -233,15 +233,29 @@ class ConfigLoader:
         if token and token.startswith('${') and token.endswith('}'):
             raise ConfigError(f"GitHub token not set. Please set the {token[2:-1]} environment variable.")
         
-        # Validate achievement targets are positive integers
+        # Validate achievement targets
         achievements = self.get('achievements', {})
+        # List of known achievement types that use dict config with 'enabled' flag
+        achievement_types = ['quickdraw', 'yolo', 'pull_shark', 'pair_extraordinaire', 'galaxy_brain']
+        
         for key, value in achievements.items():
-            if key == 'language_repos':
+            if key in achievement_types:
+                # These are achievement configurations with 'enabled' flags
+                if isinstance(value, dict):
+                    # Validate has 'enabled' key if dict is provided
+                    if 'enabled' not in value:
+                        raise ConfigError(f"Achievement '{key}' configuration must have 'enabled' field")
+                    if not isinstance(value['enabled'], bool):
+                        raise ConfigError(f"Achievement '{key}' enabled field must be boolean")
+                else:
+                    raise ConfigError(f"Achievement '{key}' must be a configuration dictionary")
+            elif key == 'language_repos':
                 if isinstance(value, dict):
                     for lang, count in value.items():
                         if not isinstance(count, int) or count < 0:
                             raise ConfigError(f"Achievement target for {lang} repositories must be a positive integer")
             else:
+                # Regular achievement targets should be integers
                 if not isinstance(value, int) or value < 0:
                     raise ConfigError(f"Achievement target '{key}' must be a positive integer")
         

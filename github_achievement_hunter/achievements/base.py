@@ -119,8 +119,10 @@ class AchievementHunter(ABC):
             # Update progress - mark as in progress
             self.progress_tracker.update_achievement(
                 self.achievement_name,
-                status='in_progress',
-                started_at=datetime.now().isoformat()
+                {
+                    'status': 'in_progress',
+                    'started_at': datetime.now().isoformat()
+                }
             )
             
             # Execute achievement logic
@@ -139,8 +141,10 @@ class AchievementHunter(ABC):
                 self.logger.error(f"Failed to execute {self.achievement_name} achievement")
                 self.progress_tracker.update_achievement(
                     self.achievement_name,
-                    status='failed',
-                    error=f"Execution failed at {datetime.now().isoformat()}"
+                    {
+                        'status': 'failed',
+                        'error': f"Execution failed at {datetime.now().isoformat()}"
+                    }
                 )
             
             return success
@@ -149,9 +153,11 @@ class AchievementHunter(ABC):
             self.logger.error(f"Unexpected error in {self.achievement_name} achievement hunter: {str(e)}")
             self.progress_tracker.update_achievement(
                 self.achievement_name,
-                status='error',
-                error=str(e),
-                error_time=datetime.now().isoformat()
+                {
+                    'status': 'error',
+                    'error': str(e),
+                    'error_time': datetime.now().isoformat()
+                }
             )
             raise
 
@@ -180,10 +186,12 @@ class AchievementHunter(ABC):
         
         self.progress_tracker.update_achievement(
             self.achievement_name,
-            status='completed',
-            completed=True,
-            completed_at=completion_time.isoformat(),
-            execution_time_seconds=execution_time
+            {
+                'status': 'completed',
+                'completed': True,
+                'completed_at': completion_time.isoformat(),
+                'execution_time_seconds': execution_time
+            }
         )
         
         # Log summary statistics
@@ -279,8 +287,10 @@ class AchievementHunter(ABC):
             progress_percent = (processed / total_items) * 100
             self.progress_tracker.update_achievement(
                 self.achievement_name,
-                progress=progress_percent,
-                last_batch_processed=batch_num
+                {
+                    'progress': progress_percent,
+                    'last_batch_processed': batch_num
+                }
             )
             
             # Delay between batches (except for the last batch)

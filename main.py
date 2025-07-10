@@ -66,10 +66,21 @@ def main():
     
     # Initialize GitHub clients
     primary_auth = GitHubAuthenticator.from_config(config.config['github']['primary_account'])
-    secondary_auth = GitHubAuthenticator.from_config(config.config['github']['secondary_account'])
+    primary_client = GitHubClient(primary_auth, config.config['settings']['rate_limit_buffer'])
     
-    primary_client = GitHubClient(primary_auth.get_client(), config.config['settings']['rate_limit_buffer'])
-    secondary_client = GitHubClient(secondary_auth.get_client(), config.config['settings']['rate_limit_buffer'])
+    # Secondary account is optional - only initialize if configured
+    secondary_auth = None
+    secondary_client = None
+    if config.config['github'].get('secondary_account'):
+        try:
+            secondary_auth = GitHubAuthenticator.from_config(config.config['github']['secondary_account'])
+            secondary_client = GitHubClient(secondary_auth, config.config['settings']['rate_limit_buffer'])
+            logger.info("Secondary account authenticated successfully")
+        except Exception as e:
+            logger.warning(f"Failed to authenticate secondary account: {e}")
+            if any(achievement in ['pull_shark', 'pair_extraordinaire', 'galaxy_brain'] for achievement in achievements_to_run):
+                logger.error("Secondary account is required for multi-account achievements")
+                sys.exit(1)
     
     # Determine which achievements to run
     achievements_to_run = args.achievements

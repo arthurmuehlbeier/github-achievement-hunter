@@ -91,22 +91,38 @@ class GitHubAuthenticator:
             
             # Check OAuth scopes
             # Note: GitHub API v3 returns scopes in response headers
-            # We need to check the last response headers
-            if hasattr(client, '_Github__requester'):
-                last_headers = client._Github__requester._Requester__last_response_headers
-                if last_headers and 'x-oauth-scopes' in last_headers:
-                    granted_scopes = set(
-                        scope.strip() 
-                        for scope in last_headers['x-oauth-scopes'].split(',')
-                        if scope.strip()
-                    )
+            # Try to access the response headers to check scopes
+            try:
+                if hasattr(client, '_Github__requester'):
+                    requester = client._Github__requester
+                    # Try different attribute names for compatibility with different PyGithub versions
+                    last_headers = None
+                    if hasattr(requester, '_Requester__last_response_headers'):
+                        last_headers = requester._Requester__last_response_headers
+                    elif hasattr(requester, 'last_response_headers'):
+                        last_headers = requester.last_response_headers
+                    elif hasattr(requester, '_last_response_headers'):
+                        last_headers = requester._last_response_headers
                     
-                    missing_scopes = self.REQUIRED_SCOPES - granted_scopes
-                    if missing_scopes:
-                        raise InsufficientScopesError(
-                            f"Token missing required scopes: {', '.join(missing_scopes)}. "
-                            f"Granted scopes: {', '.join(granted_scopes) if granted_scopes else 'none'}"
+                    if last_headers and 'x-oauth-scopes' in last_headers:
+                        granted_scopes = set(
+                            scope.strip() 
+                            for scope in last_headers['x-oauth-scopes'].split(',')
+                            if scope.strip()
                         )
+                        
+                        missing_scopes = self.REQUIRED_SCOPES - granted_scopes
+                        if missing_scopes:
+                            raise InsufficientScopesError(
+                                f"Token missing required scopes: {', '.join(missing_scopes)}. "
+                                f"Granted scopes: {', '.join(granted_scopes) if granted_scopes else 'none'}"
+                            )
+                    else:
+                        # If we can't check scopes, log a warning but continue
+                        self.logger.warning("Unable to verify OAuth scopes - headers not accessible")
+            except AttributeError:
+                # If scope checking fails due to PyGithub version differences, log and continue
+                self.logger.warning("Unable to verify OAuth scopes due to PyGithub version compatibility")
             
             self.logger.info(f"Successfully validated token for user: {self.username}")
             
